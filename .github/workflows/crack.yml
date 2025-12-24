@@ -7,12 +7,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Tools
-        run: sudo apt-get update && sudo apt-get install -y fcrackzip
-      - name: Run Brute Force
+        run: sudo apt-get update && sudo apt-get install -y fcrackzip john
+      - name: Brute Force Digits
         run: |
-          if [ -f "Vless.zip" ]; then
-            fcrackzip -v -u -l 1-8 -c '1' Vless.zip
-          else
-            echo "❌ ФАЙЛА Vless.zip НЕТ В РЕПОЗИТОРИИ!"
-            exit 1
-          fi
+          # Сначала пробуем цифры 1-8
+          fcrackzip -v -u -l 1-8 -c '1' Vless.zip || echo "Цифры не подошли"
+      - name: Shield Dictionary Attack
+        run: |
+          zip2john Vless.zip > vless.hash
+          # Пароли, которые мы видели на щите в видео 🛡️
+          echo -e "v2ray\nvless\nv2rayvless\nvlessv2ray\nSasha\nsasha" > shield_pass.txt
+          john --wordlist=shield_pass.txt vless.hash || echo "Словарь со щита не сработал"
+          john --show vless.hash
