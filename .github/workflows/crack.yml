@@ -1,26 +1,29 @@
 
-name: Sasha Archive Cracker
+name: Sasha Archive Cracker (Final Assault)
 on: [workflow_dispatch]
 jobs:
   crack:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install fcrackzip
+      - name: Install Tools
         run: sudo apt-get update && sudo apt-get install -y fcrackzip
-      - name: Brute Force and Reveal
+      - name: Heavy Attack
         run: |
-          echo "🕵️‍♀️ Начинаю штурм старого архива..."
-          # Запускаем перебор и сохраняем результат в переменную
-          RESULT=$(fcrackzip -v -u -l 1-8 -c '1' Vless.zip)
+          echo "🕵️‍♀️ Погнали, Boss! Токены на месте, начинаем штурм!"
           
-          echo "------------------------------------------"
-          echo "✨ BOSS, СМОТРИ СЮДА! ПАРОЛЬ НИЖЕ: ✨"
-          echo "$RESULT"
-          echo "------------------------------------------"
+          # Наш секретный список слов
+          echo "sasha" > pass.txt
+          echo "Sasha" >> pass.txt
+          echo "SashaV" >> pass.txt
+          echo "vpnclub" >> pass.txt
+          echo "2025" >> pass.txt
+          echo "vless" >> pass.txt
+          echo "v2ray" >> pass.txt
           
-          # Вытаскиваем само слово/число пароля
-          PW=$(echo $RESULT | awk '{print $5}')
-          
-          echo "📄 СОДЕРЖИМОЕ Vless.txt:"
-          unzip -P "$PW" -p Vless.zip
+          # Пробуем словарь мгновенно
+          fcrackzip -v -u -D -p pass.txt Vless.zip && exit 0 || echo "Словарь не подошел."
+
+          # Пробуем буквы + цифры (смесь, до 5 знаков)
+          echo "🚀 Проверяем короткие смеси (буквы + цифры)..."
+          fcrackzip -v -u -l 1-5 -c 'a1' Vless.zip && exit 0
