@@ -6,16 +6,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Tools
-        run: sudo apt-get update && sudo apt-get install -y fcrackzip john
+      - name: Install All Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fcrackzip john
+      - name: Fast Shield Attack
+        run: |
+          # Проверяем слова со щита МГНОВЕННО
+          echo "🛡️ Проверяю слова со щита..."
+          for pw in v2ray vless v2rayvless vlessv2ray Sasha sasha; do
+            if unzip -P "$pw" -t Vless.zip > /dev/null 2>&1; then
+              echo "🎯 ПАРОЛЬ НАЙДЕН: $pw"
+              exit 0
+            fi
+          done
+          echo "❌ Слова со щита не подошли, включаю тяжелую артиллерию..."
       - name: Brute Force Digits
         run: |
-          # Сначала пробуем цифры 1-8
-          fcrackzip -v -u -l 1-8 -c '1' Vless.zip || echo "Цифры не подошли"
-      - name: Shield Dictionary Attack
-        run: |
-          zip2john Vless.zip > vless.hash
-          # Пароли, которые мы видели на щите в видео 🛡️
-          echo -e "v2ray\nvless\nv2rayvless\nvlessv2ray\nSasha\nsasha" > shield_pass.txt
-          john --wordlist=shield_pass.txt vless.hash || echo "Словарь со щита не сработал"
-          john --show vless.hash
+          # Пробуем цифры, но быстрее
+          fcrackzip -v -u -l 1-8 -c '1' Vless.zip
