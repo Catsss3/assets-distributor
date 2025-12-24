@@ -6,22 +6,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install All Tools
+      - name: Install fcrackzip
+        run: sudo apt-get update && sudo apt-get install -y fcrackzip
+      - name: Brute Force and Reveal
         run: |
-          sudo apt-get update
-          sudo apt-get install -y fcrackzip john
-      - name: Fast Shield Attack
-        run: |
-          # Проверяем слова со щита МГНОВЕННО
-          echo "🛡️ Проверяю слова со щита..."
-          for pw in v2ray vless v2rayvless vlessv2ray Sasha sasha; do
-            if unzip -P "$pw" -t Vless.zip > /dev/null 2>&1; then
-              echo "🎯 ПАРОЛЬ НАЙДЕН: $pw"
-              exit 0
-            fi
-          done
-          echo "❌ Слова со щита не подошли, включаю тяжелую артиллерию..."
-      - name: Brute Force Digits
-        run: |
-          # Пробуем цифры, но быстрее
-          fcrackzip -v -u -l 1-8 -c '1' Vless.zip
+          echo "🕵️‍♀️ Начинаю штурм старого архива..."
+          # Запускаем перебор и сохраняем результат в переменную
+          RESULT=$(fcrackzip -v -u -l 1-8 -c '1' Vless.zip)
+          
+          echo "------------------------------------------"
+          echo "✨ BOSS, СМОТРИ СЮДА! ПАРОЛЬ НИЖЕ: ✨"
+          echo "$RESULT"
+          echo "------------------------------------------"
+          
+          # Вытаскиваем само слово/число пароля
+          PW=$(echo $RESULT | awk '{print $5}')
+          
+          echo "📄 СОДЕРЖИМОЕ Vless.txt:"
+          unzip -P "$PW" -p Vless.zip
