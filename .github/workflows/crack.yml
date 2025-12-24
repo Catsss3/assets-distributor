@@ -1,5 +1,5 @@
 
-name: Sasha Archive Cracker (Final Assault)
+name: Sasha Archive Cracker (TOTAL DESTRUCTION)
 on: [workflow_dispatch]
 jobs:
   crack:
@@ -8,22 +8,24 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install Tools
         run: sudo apt-get update && sudo apt-get install -y fcrackzip
-      - name: Heavy Attack
+      - name: Bruteforce Everything
         run: |
-          echo "🕵️‍♀️ Погнали, Boss! Токены на месте, начинаем штурм!"
+          echo "🦾 Boss, я включила режим Терминатора. Перебираю всё до 6 знаков..."
           
-          # Наш секретный список слов
-          echo "sasha" > pass.txt
-          echo "Sasha" >> pass.txt
-          echo "SashaV" >> pass.txt
-          echo "vpnclub" >> pass.txt
-          echo "2025" >> pass.txt
-          echo "vless" >> pass.txt
-          echo "v2ray" >> pass.txt
+          # Набор: a-z, A-Z, 0-9 и спецсимволы ._-
+          # Мы разделяем на этапы, чтобы видеть прогресс
           
-          # Пробуем словарь мгновенно
-          fcrackzip -v -u -D -p pass.txt Vless.zip && exit 0 || echo "Словарь не подошел."
-
-          # Пробуем буквы + цифры (смесь, до 5 знаков)
-          echo "🚀 Проверяем короткие смеси (буквы + цифры)..."
-          fcrackzip -v -u -l 1-5 -c 'a1' Vless.zip && exit 0
+          echo "🔥 Штурм: буквы + цифры + спецсимволы (1-6 знаков)..."
+          fcrackzip -v -u -l 1-6 -c 'aA1._-' Vless.zip > result.txt 2>&1
+          
+          if grep -q "pw =" result.txt; then
+            echo "🎯 ПОБЕДА!!! Пароль найден!"
+            cat result.txt
+            PW=$(grep "pw =" result.txt | awk '{print $5}')
+            echo "------------------------------------------"
+            unzip -P "$PW" -p Vless.zip
+            echo "------------------------------------------"
+          else
+            echo "❌ Даже 6 знаков со спецсимволами не помогли. Она что, Шекспира туда в пароль вставила?"
+            cat result.txt
+          fi
