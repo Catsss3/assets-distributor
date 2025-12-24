@@ -1,0 +1,25 @@
+name: Sasha Archive Cracker
+on:
+  workflow_dispatch: # Запуск кнопкой Boss! ✨
+
+jobs:
+  crack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: sudo apt-get install fcrackzip
+
+      - name: Brute Force Digits
+        run: |
+          # Проверяем цифры от 1 до 8 знаков (это очень часто на 4PDA)
+          # fcrackzip - это супер-быстрая утилита на C++
+          echo "🚀 Начинаю скоростной перебор цифр..."
+          fcrackzip -u -l 1-8 -c '1' extracted_secret.zip || echo "Цифры не подошли 😿"
+
+      - name: Brute Force Common Alpha
+        run: |
+          # Если цифры не вышли, пробуем короткие буквы (до 5 знаков)
+          echo "🏃‍♀️ Пробую буквы..."
+          fcrackzip -u -l 1-5 -c 'a' extracted_secret.zip || echo "Буквы тоже мимо..."
