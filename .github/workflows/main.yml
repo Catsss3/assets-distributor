@@ -1,0 +1,23 @@
+name: Sync Assets Metadata
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install google-generativeai requests
+      - name: Run sync script
+        env:
+          # ВОТ ТУТ МАГИЯ: связываем секрет репозитория с переменной для скрипта
+          WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python core_sync.py
