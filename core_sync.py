@@ -19,17 +19,6 @@ def check_server(config):
     except: pass
 
 def main():
-    # Gemini ищет ДОПОЛНИТЕЛЬНЫЕ источники
-    try:
-        prompt = "Provide 5 new RAW direct URLs for vless/hysteria2 configs. Only URLs."
-        resp = model.generate_content(prompt)
-        new_urls = [u for u in resp.text.split() if u.startswith('http')]
-        with open("sources.txt", "a+") as fs:
-            fs.seek(0); existing = fs.read()
-            for u in new_urls:
-                if u not in existing: fs.write(f"\n{u}")
-    except: pass
-
     with open("sources.txt", "r") as fs:
         urls = [l.strip() for l in fs if l.strip() and not l.startswith("#")]
     
@@ -49,14 +38,15 @@ def main():
         with ThreadPoolExecutor(max_workers=100) as executor:
             executor.map(check_server, configs)
         
-        # Удаляем старые sub*.txt перед записью
+        # Удаляем старые файлы перед записью
         for f in os.listdir('.'):
             if f.startswith("sub") and f.endswith(".txt"): os.remove(f)
 
-        # Нарезка по 500 в Base64
+        # ЗАПИСЬ С ПРАВИЛЬНЫМИ ИМЕНАМИ (sub_list)
         for i in range(0, len(valid_configs), 500):
             chunk = valid_configs[i:i+500]
-            name = "sub.txt" if i == 0 else f"sub{i//500}.txt"
+            # Формат: sub_list.txt, sub_list1.txt, sub_list2.txt
+            name = "sub_list.txt" if i == 0 else f"sub_list{i//500}.txt"
             with open(name, "w") as out:
                 out.write(base64.b64encode("\n".join(chunk).encode()).decode())
 
