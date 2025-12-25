@@ -1,85 +1,74 @@
 
-import requests, base64, os, socket, concurrent.futures, re
+import requests, base64, os, socket, concurrent.futures, re, time
 
 GITHUB_TOKEN = os.getenv('WORKFLOW_TOKEN')
 REPO_NAME = "Catsss3/assets-distributor"
 
 def check_validity(proxy):
     try:
-        # Парсим хост и порт из ссылки
         pattern = r'@([^:/]+):(\d+)'
         match = re.search(pattern, proxy)
         if not match: return None
-        
-        host = match.group(1)
-        port = int(match.group(2))
-        
-        # Пытаемся подключиться (таймаут 2.5 сек)
-        with socket.create_connection((host, port), timeout=2.5):
-            return proxy
-    except:
-        return None
+        host, port = match.group(1), int(match.group(2))
+        start = time.time()
+        with socket.create_connection((host, port), timeout=2.0):
+            return (time.time() - start, proxy)
+    except: return None
+
+def push_to_github(filename, content_b64):
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{filename}"
+    r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"} )
+    sha = r.json().get('sha') if r.status_code == 200 else None
+    
+    # Кодируем содержимое еще раз в b64 для API Гитхаба
+    payload = {
+        "message": f"💅 Update {filename}",
+        "content": base64.b64encode(content_b64.encode()).decode(),
+        "sha": sha
+    }
+    requests.put(url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"} )
 
 def main():
     headers = {'User-Agent': 'Mozilla/5.0'}
-    
-    # 1. Берем источники
-    s_url = f"https://api.github.com/repos/{REPO_NAME}/contents/sources.txt"
-    s_res = requests.get(s_url, headers={"Authorization": f"token {GITHUB_TOKEN}"} )
+    s_res = requests.get(f"https://api.github.com/repos/{REPO_NAME}/contents/sources.txt", 
+                         headers={"Authorization": f"token {GITHUB_TOKEN}"} )
     if s_res.status_code != 200: return
     sources = base64.b64decode(s_res.json()['content']).decode().splitlines()
     
-    found_proxies = []
+    raw_list = []
     for url in sources:
-        url = url.strip()
-        if not url: continue
         try:
-            r = requests.get(url, timeout=10, headers=headers)
+            r = requests.get(url.strip(), timeout=10, headers=headers)
             if r.status_code == 200:
                 text = r.text
-                # Декодируем, если источник в Base64
                 if "://" not in text[:50]:
                     try: text = base64.b64decode(text).decode('utf-8')
                     except: pass
-                found_proxies.extend(text.splitlines())
+                raw_list.extend(text.splitlines())
         except: continue
 
-    # 2. Фильтруем протоколы (vless и hysteria2)
-    target_proxies = [p.strip() for p in found_proxies if p.startswith(("vless://", "hy2://", "hysteria2://"))]
-    unique_proxies = list(set(target_proxies))
+    unique = list(set([p.strip() for p in raw_list if p.startswith(("vless://", "hy2://", "hysteria2://"))]))
+    print(f"🔍 Проверяем {len(unique)} серверов...")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as exec:
+        results = [r for r in list(exec.map(check_validity, unique)) if r]
     
-    print(f"🔍 Найдено {len(unique_proxies)} кандидатов. Проверяем на валидность...")
-
-    # 3. Проверка на выживаемость (в 100 потоков для скорости)
-    valid_list = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
-        results = list(executor.map(check_validity, unique_proxies))
-        valid_list = [r for r in results if r]
-
-    if not valid_list:
-        print("❌ Ни один прокси не прошел проверку.")
-        # Чтобы sub.txt не был совсем пустым и не ломал подписку, 
-        # можно оставить старые или выдать ошибку. Но мы сделаем честно.
-        final_str = ""
-    else:
-        final_str = "\n".join(valid_list)
-        print(f"✅ Отобрано {len(valid_list)} рабочих конфигов.")
-
-    # 4. Упаковка в Base64 (Pawdroid style)
-    final_b64 = base64.b64encode(final_str.encode('utf-8')).decode('utf-8')
+    # Сортируем по скорости
+    results.sort(key=lambda x: x[0])
+    all_valid = [r[1] for r in results]
     
-    # 5. Пушим в GitHub в файл sub.txt
-    p_url = f"https://api.github.com/repos/{REPO_NAME}/contents/sub.txt"
-    p_res = requests.get(p_url, headers={"Authorization": f"token {GITHUB_TOKEN}"} )
-    sha = p_res.json().get('sha') if p_res.status_code == 200 else None
-    
-    payload = {
-        "message": f"💅 Clean & Valid: {len(valid_list)} (VLESS/HY2)",
-        "content": base64.b64encode(final_b64.encode('utf-8')).decode('utf-8'),
-        "sha": sha
-    }
-    requests.put(p_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"} )
-    print("🚀 Файл sub.txt успешно обновлен!")
+    # Режем на куски по 500
+    chunk_size = 500
+    for i in range(0, len(all_valid), chunk_size):
+        chunk = all_valid[i:i + chunk_size]
+        filename = "sub.txt" if i == 0 else f"sub{i // chunk_size}.txt"
+        
+        # Делаем Base64 от списка прокси (Pawdroid style)
+        chunk_str = "\n".join(chunk)
+        chunk_b64 = base64.b64encode(chunk_str.encode()).decode()
+        
+        push_to_github(filename, chunk_b64)
+        print(f"✅ Создан {filename} с {len(chunk)} серверами")
+        if i // chunk_size >= 10: break # Ограничимся 10 файлами (5000 серверов), чтобы не спамить
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
