@@ -1,33 +1,46 @@
-import requests
-import re
-import os
-from github import Github
 
-def hunt():
-    token = os.getenv('WORKFLOW_TOKEN')
-    repo_name = "Catsss3/assets-distributor"
-    channels = ["Evay_vpn", "v2rayng_org", "v2ray_free_conf", "V2Ray_VLESS_Reality", "Shadowsocks_Unit"]
-    
-    all_configs = []
-    for channel in channels:
-        try:
-            res = requests.get(f"https://t.me/s/{channel}", timeout=10)
-            found = re.findall(r'(?:vless|hysteria2|hy2|vmess|ss)://[^\s<"]+', res.text)
-            all_configs.extend([c.replace('&amp;', '&').split('<')[0] for c in found])
-        except: pass
-    
-    unique_configs = "\n".join(list(dict.fromkeys(all_configs)))
-    if not unique_configs: return
+import requests, base64, os, socket, concurrent.futures
+GITHUB_TOKEN = os.getenv('WORKFLOW_TOKEN')
+REPO_NAME = "Catsss3/assets-distributor"
 
-    g = Github(token)
-    repo = g.get_repo(repo_name)
-    file_path = "collected_proxies.txt"
-    
+def check_proxy(proxy):
     try:
-        contents = repo.get_contents(file_path)
-        repo.update_file(contents.path, "🤖 Авто-охота: обновление базы", unique_configs, contents.sha)
-    except:
-        repo.create_file(file_path, "🚀 Авто-охота: создание базы", unique_configs)
+        host_port = proxy.split('@')[1].split('?')[0].split('#')[0]
+        host, port = host_port.split(':')
+        with socket.create_connection((host, int(port)), timeout=2):
+            return proxy
+    except: return None
 
-if __name__ == "__main__":
-    hunt()
+def main():
+    # Качаем источники
+    s_res = requests.get(f"https://api.github.com/repos/{REPO_NAME}/contents/sources.txt", 
+                         headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    sources = base64.b64decode(s_res.json()['content']).decode().splitlines()
+    
+    raw_found = []
+    for url in sources:
+        try:
+            r = requests.get(url.strip(), timeout=10)
+            if r.status_code == 200:
+                text = r.text
+                if "vless://" not in text:
+                    try: text = base64.b64decode(text).decode('utf-8')
+                    except: pass
+                raw_found.extend(text.splitlines())
+        except: continue
+
+    # Чистим и проверяем ВСЁ
+    raw_list = list(set([p.strip() for p in raw_found if "vless://" in p or "hy2" in p]))
+    print(f"Проверяю {len(raw_list)} штук...")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as exec:
+        valid = [r for r in list(exec.map(check_proxy, raw_list)) if r]
+    
+    # Сохраняем результат
+    content = "\n".join(valid)
+    p_url = f"https://api.github.com/repos/{REPO_NAME}/contents/collected_proxies.txt"
+    p_res = requests.get(p_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    sha = p_res.json().get('sha') if p_res.status_code == 200 else None
+    requests.put(p_url, json={"message": "💅 Blondie: Validated Update", "content": base64.b64encode(content.encode()).decode(), "sha": sha}, 
+                 headers={"Authorization": f"token {GITHUB_TOKEN}"})
+if __name__ == "__main__": main()
