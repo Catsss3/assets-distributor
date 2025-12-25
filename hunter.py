@@ -34,27 +34,37 @@ def main():
                 raw_found.extend(text.splitlines())
         except: continue
 
-    clean_list = [p.strip() for p in raw_found if p.startswith(("vless://", "hy2://", "hysteria2://"))]
-    unique_list = list(set(clean_list))
+    valid_proxies = [p.strip() for p in raw_found if p.startswith(("vless://", "hy2://", "hysteria2://"))]
+    unique_proxies = list(set(valid_proxies))
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=100) as exec:
-        valid = [r for r in list(exec.map(check_proxy, unique_list)) if r]
+        valid = [r for r in list(exec.map(check_proxy, unique_proxies)) if r]
     
-    if not valid: return
+    if not valid: 
+        print("❌ Живых прокси не найдено!")
+        return
 
-    # Сохраняем как ЧИСТЫЙ ТЕКСТ (без Base64)
+    # ЧИСТЫЙ ТЕКСТ БЕЗ ОШИБОК
     content_str = "\n".join(valid)
     
+    # ПУШИМ В GITHUB
     p_url = f"https://api.github.com/repos/{REPO_NAME}/contents/sub.txt"
     p_res = requests.get(p_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
     sha = p_res.json().get('sha') if p_res.status_code == 200 else None
     
+    # Важно: кодируем строку в base64 для API GitHub
+    encoded_content = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
+    
     payload = {
-        "message": f"💅 Blondie Plain Text: {len(valid)} proxies",
-        "content": base64.b64encode(content_str.encode('utf-8')).decode('utf-8'),
+        "message": f"💅 Blondie Fix: {len(valid)} proxies",
+        "content": encoded_content,
         "sha": sha
     }
-    requests.put(p_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-    print(f"✅ Готово! Чистый текст в sub.txt. Живых: {len(valid)}")
+    
+    final_res = requests.put(p_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
+    if final_res.status_code in [200, 201]:
+        print(f"✅ Успешно! Файл sub.txt теперь содержит {len(valid)} строк.")
+    else:
+        print(f"❌ Ошибка пуша: {final_res.status_code}")
 
 if __name__ == "__main__": main()
