@@ -8,11 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: pip install requests google-generativeai
+      - run: pip install requests
       - run: python core_sync.py
       - run: |
           git config user.name "Blondie-Bot"
           git config user.email "bot@ai.com"
-          git add .
-          git commit -m "🚀 Auto-Update" || exit 0
+          git add sub*.txt
+          git commit -m "🚀 Updates" || exit 0
           git push
