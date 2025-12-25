@@ -6,6 +6,7 @@ REPO_NAME = "Catsss3/assets-distributor"
 
 def check_proxy(proxy):
     try:
+        if not proxy or '@' not in proxy: return None
         host_port = proxy.split('@')[1].split('?')[0].split('#')[0]
         host, port = host_port.split(':')
         with socket.create_connection((host, int(port)), timeout=2):
@@ -21,8 +22,10 @@ def main():
     
     raw_found = []
     for url in sources:
+        url = url.strip()
+        if not url: continue
         try:
-            r = requests.get(url.strip(), timeout=10, headers=headers)
+            r = requests.get(url, timeout=10, headers=headers)
             if r.status_code == 200:
                 text = r.text
                 if "vless://" not in text and "hy2://" not in text:
@@ -39,21 +42,19 @@ def main():
     
     if not valid: return
 
-    # Формируем чистый Base64
+    # Сохраняем как ЧИСТЫЙ ТЕКСТ (без Base64)
     content_str = "\n".join(valid)
-    final_b64 = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
     
-    # ПУШИМ В НОВЫЙ ФАЙЛ sub.txt
     p_url = f"https://api.github.com/repos/{REPO_NAME}/contents/sub.txt"
     p_res = requests.get(p_url, headers={"Authorization": f"token {GITHUB_TOKEN}"})
     sha = p_res.json().get('sha') if p_res.status_code == 200 else None
     
     payload = {
-        "message": f"💅 Blondie NEW sub: {len(valid)} proxies",
-        "content": base64.b64encode(final_b64.encode('utf-8')).decode('utf-8'),
+        "message": f"💅 Blondie Plain Text: {len(valid)} proxies",
+        "content": base64.b64encode(content_str.encode('utf-8')).decode('utf-8'),
         "sha": sha
     }
     requests.put(p_url, json=payload, headers={"Authorization": f"token {GITHUB_TOKEN}"})
-    print(f"✅ Успешно! Файл sub.txt обновлен. Живых: {len(valid)}")
+    print(f"✅ Готово! Чистый текст в sub.txt. Живых: {len(valid)}")
 
 if __name__ == "__main__": main()
