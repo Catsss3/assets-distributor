@@ -8,17 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: pip install requests
+      - run: pip install requests google-generativeai
       - run: python core_sync.py
-      - name: Check files and push
-        run: |
+      - run: |
           git config user.name "Blondie-Bot"
           git config user.email "bot@ai.com"
-          # Если файлы появились, добавляем и пушим
-          if ls sub*.txt 1> /dev/null 2>&1; then
-            git add sub*.txt
-            git commit -m "🚀 Auto-Update"
-            git push
-          else
-            print "Никаких изменений не найдено."
-          fi
+          git add .
+          git commit -m "🚀 Auto-Update (Full Sources + Valid)" || exit 0
+          git push
