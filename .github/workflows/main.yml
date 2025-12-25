@@ -1,21 +1,23 @@
 
-name: 💅 Blondie Pro-Check
+name: Blondie-Pro-Check
 on:
   schedule:
     - cron: '0 */3 * * *'
   workflow_dispatch:
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Python
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Run
+      - name: Run Hunter
         env:
           WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
         run: |
           pip install requests
-          curl -O https://raw.githubusercontent.com/Catsss3/assets-distributor/main/hunter.py
           python hunter.py
