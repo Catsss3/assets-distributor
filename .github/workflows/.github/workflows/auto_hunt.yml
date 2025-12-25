@@ -1,0 +1,28 @@
+name: 6-Hour Proxy Hunt
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Ровно каждые 6 часов
+  workflow_dispatch: # Чтобы ты мог запустить его кнопкой в любое время
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests PyGithub
+
+      - name: Run Hunt Script
+        env:
+          # Используем твои секреты, которые мы видели на скриншоте
+          WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python hunter.py # Убедись, что твой скрипт в репо называется hunter.py
