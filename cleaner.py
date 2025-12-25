@@ -2,12 +2,12 @@ import base64, re, os, random
 from github import Github
 
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
-MAX_PROXIES = 500  # Лимит, чтобы Nekobox не ругался 🎀
+MAX_PROXIES = 300  # Сделаем чуть меньше для гарантии 🎀
 
 def smart_decode(content_bytes):
     try:
         text = content_bytes.decode('utf-8')
-        if 'vless://' not in text and 'hysteria2://' not in text and 'hy2://' not in text:
+        if '://' not in text:
             return base64.b64decode(text.strip()).decode('utf-8')
         return text
     except:
@@ -18,7 +18,8 @@ def is_elite(line):
     line = line.strip()
     if not line or not any(line.startswith(p) for p in ['vless://', 'hysteria2://', 'hy2://']):
         return False
-    if '@' not in line or not re.search(r':[0-9]+', line):
+    # Самая строгая проверка структуры для Nekobox
+    if '@' not in line or ':' not in line.split('@')[-1]:
         return False
     return True
 
@@ -42,16 +43,16 @@ def main():
                         seen.add(core)
 
     if all_proxies:
-        # Перемешиваем, чтобы список был разнообразным 🎲
         random.shuffle(all_proxies)
-        # Ограничиваем количество, чтобы файл был легким 🕊️
         limited_proxies = all_proxies[:MAX_PROXIES]
         
+        # ВАЖНО: Сохраняем как ЧИСТЫЙ ТЕКСТ, а не Base64 👄🫦
         final_data = "\n".join(limited_proxies)
-        encoded = base64.b64encode(final_data.encode('utf-8')).decode('utf-8')
+        
         main_f = repo.get_contents("sub_list.txt")
-        repo.update_file(main_f.path, f"💅🏼 Lite Update: {len(limited_proxies)} Elite Proxies", encoded, main_f.sha)
-        print(f"✅ Готово! Сохранила {len(limited_proxies)} лучших штук.")
+        # Обновляем файл чистым текстом
+        repo.update_file(main_f.path, f"💎 Plain Text Update: {len(limited_proxies)} Proxies", final_data, main_f.sha)
+        print(f"✅ Готово! Сохранила {len(limited_proxies)} штук в открытом виде.")
 
 if __name__ == "__main__":
     main()
