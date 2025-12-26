@@ -1,5 +1,5 @@
 
-name: "🚀 Ultra Cleaner Engine 204"
+name: "🚀 Ultra Cleaner Engine 204 + Gemini Vision"
 on:
   schedule:
     - cron: "0 */8 * * *"
@@ -16,16 +16,16 @@ jobs:
         with:
           python-version: '3.9'
       - name: Install dependencies
-        run: pip install requests
-      - name: Execute Clean & 204 Check
+        run: pip install requests google-generativeai
+      - name: Execute Clean & AI Discovery
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API: ${{ secrets.GEMINI_API }}
           WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
         run: python scripts/engine.py
       - name: Deploy Results
         run: |
           git config --global user.name "Blondie-Bot"
           git config --global user.email "blondie@gemini.ai"
-          git add distributor.txt distributor.64
-          git commit -m "💅 Clean complete: URL 204 check passed" || exit 0
+          git add distributor.txt distributor.64 sources.txt
+          git commit -m "💅 Gemini Vision Update: New sources found & 204 Check Complete" || exit 0
           git push
