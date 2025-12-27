@@ -25,3 +25,4 @@ https://hideshots.eu/sub.txt
 https://vpn.fail/free-proxy/v2ray
 https://shadowmere.xyz/api/b64sub/
 https://istanbulsydneyhotel.com/blogs/site/sni.php
+https://sub.proxygo.org/v2ray.php?key=c3b65436b59a8f7eededd9362c665ee7
