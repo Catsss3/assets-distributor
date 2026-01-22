@@ -19,7 +19,7 @@ jobs:
         run: pip install requests google-generativeai
       - name: Execute Clean & AI Discovery
         env:
-          GEMINI_API: ${{ secrets.GEMINI_API }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
         run: python scripts/engine.py
       - name: Deploy Results
@@ -27,5 +27,5 @@ jobs:
           git config --global user.name "Blondie-Bot"
           git config --global user.email "blondie@gemini.ai"
           git add distributor.txt distributor.64 sources.txt
-          git commit -m "💅 Gemini Vision Update: New sources found & 204 Check Complete" || exit 0
+          git commit -m "💅 Gemini Vision Update: 2026 Engine Optimized" || exit 0
           git push
