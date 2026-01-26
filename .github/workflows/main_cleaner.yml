@@ -1,7 +1,7 @@
 name: "🚀 Stella Ultra Engine: AI & Async URL Checker"
 on:
   schedule:
-    - cron: "0 */8 * * *"   # Каждые 8 часов
+    - cron: "0 */8 * * *"
   workflow_dispatch: {}
 
 jobs:
@@ -14,7 +14,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          cache: 'pip'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -29,8 +28,8 @@ jobs:
           git config --global user.email "stella@gemini.ai"
           git add .
           if git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo "No changes."
           else
-            git commit -m "💅 Stella: Elite Engine v2.1 (Deep Fix & Cross-OS) ✨"
+            git commit -m "💅 Stella: Fix Cache & Variable Name ✨"
             git push
           fi
