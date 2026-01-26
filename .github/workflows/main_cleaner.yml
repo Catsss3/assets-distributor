@@ -1,31 +1,36 @@
-
-name: "🚀 Ultra Cleaner Engine 204 + Gemini Vision"
+name: "🚀 Stella Ultra Engine: AI & Async URL Checker"
 on:
   schedule:
-    - cron: "0 */8 * * *"
-  workflow_dispatch:
+    - cron: "0 */8 * * *"   # Каждые 8 часов
+  workflow_dispatch: {}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: "3.10"
+          cache: 'pip'
       - name: Install dependencies
-        run: pip install requests google-generativeai
-      - name: Execute Clean & AI Discovery
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-generativeai aiohttp aiofiles
+      - name: Run Stella Engine
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
         run: python scripts/engine.py
       - name: Deploy Results
         run: |
           git config --global user.name "Blondie-Bot"
-          git config --global user.email "blondie@gemini.ai"
-          git add distributor.txt distributor.64 sources.txt
-          git commit -m "💅 Gemini Vision Update: 2026 Engine Optimized" || exit 0
-          git push
+          git config --global user.email "stella@gemini.ai"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "💅 Stella: Elite Engine v2.1 (Deep Fix & Cross-OS) ✨"
+            git push
+          fi
