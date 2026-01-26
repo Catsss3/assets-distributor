@@ -1,36 +1,68 @@
 import os, asyncio, aiohttp, base64, re
-async def tcp_ping(h, p, t=2):
+
+BLACKLIST = ["trash-proxy.com", "free-vpn.org", "badnode.net", "127.0.0.1", "0.0.0.0"]
+
+async def tcp_ping(host: str, port: int, timeout: float = 2.0) -> bool:
     try:
-        c = asyncio.open_connection(h, p)
-        r, w = await asyncio.wait_for(c, timeout=t)
-        w.close()
-        await w.wait_closed()
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=timeout
+        )
+        writer.close()
+        await writer.wait_closed()
         return True
-    except: return False
-async def main():
-    if not os.path.exists("sources.txt"): return
-    with open("sources.txt", "r") as f:
-        urls = [l.strip() for l in f if l.strip().startswith("http")]
-    async with aiohttp.ClientSession() as s:
-        p = await asyncio.gather(*[s.get(u, timeout=15) for u in urls], return_exceptions=True)
-        raw = []
-        for r in p:
-            if hasattr(r, 'status') and r.status == 200:
-                raw.extend((await r.text()).splitlines())
-    uniq = {}
-    for l in raw:
-        if "vless://" in l:
-            m = re.search(r'@([^:/?#]+):(\d+)', l)
-            if m:
-                k = f"{m.group(1)}:{m.group(2)}"
-                if k not in uniq: uniq[k] = {"l": l, "h": m.group(1), "p": int(m.group(2))}
-    sem = asyncio.Semaphore(50)
-    async def check(i):
-        async with sem: return i['l'] if await tcp_ping(i['h'], i['p']) else None
-    res = await asyncio.gather(*[check(i) for i in uniq.values()])
-    v = [r for r in res if r]
-    v.sort(key=lambda x: 0 if "reality" in x.lower() else 1)
-    with open("distributor.txt", "w", encoding="utf-8") as f: f.write("\n".join(v))
+    except Exception: return False
+
+async def fetch(session: aiohttp.ClientSession, url: str) -> list[str]:
+    try:
+        async with session.get(url, timeout=15) as resp:
+            if resp.status == 200:
+                return (await resp.text()).splitlines()
+    except Exception: pass
+    return []
+
+async def main() -> None:
+    if not os.path.exists("sources.txt"):
+        print("❌ sources.txt not found")
+        return
+
+    with open("sources.txt", "r", encoding="utf-8") as f:
+        urls = [line.strip() for line in f if line.strip().startswith("http")]
+
+    print(f"📡 Downloading from {len(urls)} sources...")
+    async with aiohttp.ClientSession() as session:
+        pages = await asyncio.gather(*[fetch(session, u) for u in urls], return_exceptions=True)
+    
+    raw_links = [line.strip() for page in pages if isinstance(page, list) for line in page if "vless://" in line.lower()]
+
+    unique = {}
+    for link in raw_links:
+        if any(bad in link.lower() for bad in BLACKLIST): continue
+        m = re.search(r"vless://([^@]+)@([^:/?#]+):(\d+)", link, re.IGNORECASE)
+        if not m: continue
+
+        host, port = m.group(2), int(m.group(3))
+        key = f"{host}:{port}"
+        params_count = link.count("&") + link.count("?")
+
+        if key not in unique or params_count > unique[key]["p_count"]:
+            unique[key] = {"link": link, "host": host, "port": port, "p_count": params_count}
+
+    semaphore = asyncio.Semaphore(60)
+    async def check(entry: dict) -> str | None:
+        async with semaphore:
+            alive = await tcp_ping(entry["host"], entry["port"])
+            return entry["link"] if alive else None
+
+    print(f"🔬 Pinging {len(unique)} unique servers...")
+    results = await asyncio.gather(*[check(v) for v in unique.values()])
+    alive_links = [r for r in results if r]
+    
+    alive_links.sort(key=lambda x: 0 if any(w in x.lower() for w in ("reality", "pbk", "security=reality")) else 1)
+
+    with open("distributor.txt", "w", encoding="utf-8") as f: f.write("\n".join(alive_links))
     with open("distributor.64", "w", encoding="utf-8") as f:
-        f.write(base64.b64encode("\n".join(v).encode()).decode())
-if __name__ == "__main__": asyncio.run(main())
+        f.write(base64.b64encode("\n".join(alive_links).encode()).decode())
+    print(f"✅ Success! Live servers: {len(alive_links)}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

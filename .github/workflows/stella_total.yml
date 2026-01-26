@@ -1,4 +1,4 @@
-name: "🚀 STELLA TOTAL ENGINE"
+name: "🚀 STELLA VLESS TITAN"
 on:
   schedule: [{cron: "0 */6 * * *"}]
   workflow_dispatch: {}
@@ -9,12 +9,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-      - run: pip install aiohttp
+        with: {python-version: "3.10"}
+      - run: pip install --quiet aiohttp
       - run: python engine.py
       - name: Deploy
         run: |
           git config --global user.name "Blondie-Bot"
           git config --global user.email "stella@ai.com"
-          git add .
-          git commit -m "💅 Stella: Total Sync" --allow-empty
+          git add distributor.txt distributor.64
+          git commit -m "💅 Stella: Titan Engine Sync ✨" --allow-empty
           git push
