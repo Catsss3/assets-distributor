@@ -2,14 +2,10 @@ import aiohttp, asyncio, os, re, base64
 
 def decode_base64(data):
     try:
-        # Убираем лишние пробелы и добавляем padding если надо
         data = data.strip().replace("\n", "").replace("\r", "")
-        missing_padding = len(data) % 4
-        if missing_padding:
-            data += '=' * (4 - missing_padding)
+        while len(data) % 4: data += '='
         return base64.b64decode(data).decode('utf-8', errors='ignore')
-    except:
-        return ""
+    except: return ""
 
 async def fetch(session, url):
     try:
@@ -18,37 +14,43 @@ async def fetch(session, url):
     except: return ""
 
 async def main():
-    if not os.path.exists("sources.txt"): return
+    if not os.path.exists("sources.txt"): 
+        print("❌ НЕТ ФАЙЛА SOURCES.TXT")
+        return
     
     with open("sources.txt", "r", encoding="utf-8") as f:
         urls = [l.strip() for l in f if l.strip().startswith("http")]
     
-    print(f"🚀 ТИТАН: Потрошим {len(urls)} источников...")
+    print(f"🚀 ТИТАН: Опрашиваем {len(urls)} источников...")
     
     async with aiohttp.ClientSession() as session:
         tasks = [fetch(session, url) for url in urls]
         results = await asyncio.gather(*tasks)
     
-    pattern = r"(vless|tuic|hy2|hysteria2)://[^\s|'|\"|<|>|#]+"
-    all_nodes = []
+    # СУПЕР-ЖАДНАЯ РЕГУЛЯРКА (хватает всё: vless, tuic, hy2, vmess, ss)
+    # Ищем протокол, затем :// и всё до кавычки, пробела или конца строки
+    pattern = r"(vless|tuic|hy2|hysteria2|vmess|ss|trojan)://[^\s'\"<>\n#]+"
     
+    all_nodes = []
     for text in results:
         if not text: continue
-        # 1. Ищем в чистом виде
-        all_nodes.extend(re.findall(pattern, text))
+        # Ищем в обычном тексте
+        found_raw = re.findall(pattern, text)
+        all_nodes.extend(found_raw)
         
-        # 2. Пробуем декодировать (вдруг там Base64 конфиг)
+        # Ищем в Base64 (некоторые файлы целиком зашифрованы)
         decoded = decode_base64(text)
         if decoded:
-            all_nodes.extend(re.findall(pattern, decoded))
-            
-    # Очистка и дедупликация
+            found_decoded = re.findall(pattern, decoded)
+            all_nodes.extend(found_decoded)
+    
+    # Чистка
     all_nodes = list(set([n.strip() for n in all_nodes]))
     
     with open("distributor.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(all_nodes))
     
-    print(f"💎 УЛОВ: Найдено {len(all_nodes)} потенциальных нод.")
+    print(f"💎 ИТОГ: Найдено {len(all_nodes)} нод!")
 
 if __name__ == "__main__":
     asyncio.run(main())
