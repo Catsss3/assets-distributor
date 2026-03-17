@@ -6,29 +6,15 @@ import re
 import logging
 from typing import List, Optional, Dict
 
-# ----------------------------------------------------------------------
-# Настройки
-# ----------------------------------------------------------------------
-BLACKLIST = [
-    "trash-proxy.com",
-    "free-vpn.org",
-    "badnode.net",
-    "127.0.0.1",
-    "0.0.0.0",
-]
+# --- Настройки ---
+BLACKLIST = ["trash-proxy.com", "free-vpn.org", "badnode.net", "127.0.0.1", "0.0.0.0"]
 
-PROTOCOLS = [
-    "vless://",
-    "hysteria2://",
-    "hy2://",
-    "tuic://",
-    "ss://",
-    "trojan://",
-]
+# Оставляем только элиту. Прощайте, трояны и швадовски!
+PROTOCOLS = ["vless://", "hysteria2://", "hy2://", "tuic://"]
 
 MAX_CONCURRENT_PINGS = 120
-HTTP_TIMEOUT = 15.0          # Увеличила для медленных источников
-TCP_TIMEOUT = 0.8           # Увеличила для стабильности на МТС
+HTTP_TIMEOUT = 15.0          
+TCP_TIMEOUT = 0.8            # Твой выбор: только быстрые ноды
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,9 +22,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-# ----------------------------------------------------------------------
-# Асинхронные функции
-# ----------------------------------------------------------------------
 async def tcp_ping(host: str, port: int, timeout: float = TCP_TIMEOUT) -> bool:
     try:
         reader, writer = await asyncio.wait_for(
@@ -55,93 +38,85 @@ async def fetch(session: aiohttp.ClientSession, url: str) -> List[str]:
     try:
         async with session.get(url, timeout=HTTP_TIMEOUT, headers=headers) as resp:
             if resp.status != 200:
-                logging.warning(f"Status {resp.status} for {url}")
                 return []
-
             text = await resp.text()
-
-            # Декодирование base64 если нужно
             if not any(p in text.lower() for p in PROTOCOLS) and len(text) > 30:
                 try:
-                    # Чистим текст от возможных пробелов и переносов для b64
                     clean_text = re.sub(r'[^a-zA-Z0-9+/=]', '', text)
                     text = base64.b64decode(clean_text).decode(errors='ignore')
-                except Exception as exc:
-                    logging.debug(f"Base64 error for {url}: {exc}")
-
+                except:
+                    pass
             return text.splitlines()
-    except Exception as exc:
-        logging.error(f"Fetch error {url}: {exc}")
+    except:
         return []
 
-# ----------------------------------------------------------------------
-# Основная логика
-# ----------------------------------------------------------------------
 async def main() -> None:
     if not os.path.exists("sources.txt"):
-        logging.error("sources.txt not found!")
+        logging.error("sources.txt не найден!")
         return
 
     with open("sources.txt", "r", encoding="utf-8") as f:
         urls = [line.strip() for line in f if line.strip().lower().startswith("http")]
 
-    if not urls:
-        logging.error("No URLs in sources.txt")
-        return
-
     async with aiohttp.ClientSession() as session:
-        pages = await asyncio.gather(*[fetch(session, u) for u in urls])
+        tasks = [fetch(session, u) for u in urls]
+        pages = await asyncio.gather(*tasks)
+        
+        source_stats = {}
+        all_raw_links = []
 
-    # Сбор всех ссылок
-    raw_links = []
-    for page in pages:
-        for line in page:
-            line = line.strip()
-            if any(proto in line.lower() for proto in PROTOCOLS):
-                raw_links.append(line)
+        for url, lines in zip(urls, pages):
+            valid_lines = [l.strip() for l in lines if any(p in l.lower() for p in PROTOCOLS)]
+            source_stats[url] = {"total": len(valid_lines), "alive": 0}
+            for l in valid_lines:
+                all_raw_links.append((l, url))
 
-    unique: Dict[str, str] = {}
-    # Регулярка для извлечения host и port
+    unique: Dict[str, tuple] = {}
     pattern = re.compile(r"@([^:/?#\s]+):(\d+)")
 
-    for link in raw_links:
-        if any(bad in link.lower() for bad in BLACKLIST):
-            continue
-
+    for link, source_url in all_raw_links:
+        if any(bad in link.lower() for bad in BLACKLIST): continue
         m = pattern.search(link)
-        if not m:
-            continue
-
-        host, port = m.group(1), m.group(2)
-        key = f"{host}:{port}"
-
-        # Берем самый длинный конфиг (обычно там больше параметров обфускации)
-        if key not in unique or len(link) > len(unique[key]):
-            unique[key] = link
+        if not m: continue
+        key = f"{m.group(1)}:{m.group(2)}"
+        if key not in unique or len(link) > len(unique[key][0]):
+            unique[key] = (link, source_url)
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_PINGS)
 
-    async def check(link: str) -> Optional[str]:
+    async def check(link_data: tuple) -> Optional[tuple]:
+        link, source_url = link_data
         async with semaphore:
             m = pattern.search(link)
             if not m: return None
             host, port = m.group(1), int(m.group(2))
             if await tcp_ping(host, port):
-                return link
+                return (link, source_url)
             return None
 
-    results = await asyncio.gather(*[check(l) for l in unique.values()])
-    alive = [r for r in results if r]
+    results = await asyncio.gather(*[check(data) for data in unique.values()])
+    
+    alive_links = []
+    for r in results:
+        if r:
+            link, source_url = r
+            alive_links.append(link)
+            source_stats[source_url]["alive"] += 1
 
-    # Всегда обновляем файлы (даже если список пустой, чтобы затереть старье)
+    logging.info("--- 📊 ОТЧЕТ ПО ИСТОЧНИКАМ (КПД) ---")
+    for url, stat in source_stats.items():
+        short_url = url.split('/')[-1]
+        if stat["total"] > 0:
+            kpd = (stat["alive"] / stat["total"]) * 100
+            logging.info(f"{short_url}: Найдено {stat['total']}, Живых {stat['alive']} ({kpd:.1f}%)")
+
     with open("distributor.txt", "w", encoding="utf-8") as f:
-        f.write("\n".join(alive))
+        f.write("\n".join(alive_links))
 
     with open("distributor.64", "w", encoding="utf-8") as f:
-        content = "\n".join(alive)
-        f.write(base64.b64encode(content.encode()).decode())
+        f.write(base64.b64encode("\n".join(alive_links).encode()).decode())
 
-    logging.info(f"💎 Stella Titan 4.0 Gold: {len(alive)} alive nodes.")
+    logging.info(f"💎 Stella Titan 4.1 Gold: {len(alive_links)} чистопородных нод.")
 
 if __name__ == "__main__":
     asyncio.run(main())
