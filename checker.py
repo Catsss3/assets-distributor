@@ -2,25 +2,22 @@ import os, json, subprocess, time, socket, logging, concurrent.futures, uuid
 from urllib.parse import urlparse, parse_qs
 from typing import List, Optional, Dict
 
-# Настройки теста
 TEST_URL = "http://cp.cloudflare.com/"
-TIMEOUT, THREADS, XRAY_PATH = 7, 50, "./xray"
+TIMEOUT, THREADS, XRAY_PATH = 5, 250, "./xray" # Подняли потоки до 250!
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 def is_port_open(port: int) -> bool:
-    """Проверка, слушает ли Xray локальный SOCKS-порт."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.5)
+            s.settimeout(0.3)
             return s.connect_ex(("127.0.0.1", port)) == 0
     except: return False
 
-def wait_for_port(port: int, timeout: float = 4.0) -> bool:
-    """Ожидание открытия порта (вместо фиксированного sleep)."""
+def wait_for_port(port: int, timeout: float = 3.0) -> bool:
     end = time.time() + timeout
     while time.time() < end:
         if is_port_open(port): return True
-        time.sleep(0.2)
+        time.sleep(0.1)
     return False
 
 def parse_link(link: str) -> Optional[Dict]:
@@ -29,10 +26,7 @@ def parse_link(link: str) -> Optional[Dict]:
         d = {"proto": u.scheme, "id": u.username, "addr": u.hostname, "port": int(u.port),
              "sni": qs.get("sni", [""])[0], "net": qs.get("type", ["tcp"])[0], 
              "sec": qs.get("security", ["none"])[0], "fp": qs.get("fp", [""])[0]}
-        
-        # Для TUIC/HY2 пароль может быть в разных местах
         pwd = u.password if u.password else qs.get("pass", [qs.get("password", [""])[0]])[0]
-        
         if u.scheme == "vless":
             d.update({"pbk": qs.get("pbk", [""])[0], "sid": qs.get("sid", [""])[0], "flow": qs.get("flow", [""])[0]})
         elif u.scheme in ["tuic", "hy2", "hysteria2"]:
@@ -46,7 +40,6 @@ def test_worker(link: str, task_id: int) -> Optional[str]:
     l_port = 11000 + (task_id % 15000)
     
     outbound = {"protocol": data["proto"], "settings": {}}
-    
     if data["proto"] == "vless":
         outbound["settings"] = {"vnext": [{"address": data["addr"], "port": data["port"], "users": [{"id": data["id"], "encryption": "none", "flow": data["flow"]}]}]}
         outbound["streamSettings"] = {
@@ -59,41 +52,43 @@ def test_worker(link: str, task_id: int) -> Optional[str]:
         outbound["streamSettings"] = {"network": "udp", "security": "tls", "tlsSettings": {"serverName": data["sni"], "alpn": [data["alpn"]]}}
 
     config = {"log": {"loglevel": "none"}, "inbounds": [{"port": l_port, "protocol": "socks"}], "outbounds": [outbound]}
-    
-    cfg_name = f"cfg_{uuid.uuid4().hex[:6]}.json"
+    cfg_name = f"cfg_{uuid.uuid4().hex[:8]}.json"
     proc = None
     try:
-        with open(cfg_name, "w", encoding="utf-8") as f: json.dump(config, f)
+        with open(cfg_name, "w") as f: json.dump(config, f)
         proc = subprocess.Popen([XRAY_PATH, "-c", cfg_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
         if not wait_for_port(l_port): return None
-        
-        res = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--proxy", f"socks5://127.0.0.1:{l_port}", TEST_URL, "--max-time", str(TIMEOUT)], capture_output=True, text=True, timeout=TIMEOUT+2)
+        res = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--proxy", f"socks5://127.0.0.1:{l_port}", TEST_URL, "--max-time", "5"], capture_output=True, text=True, timeout=8)
         if res.stdout.strip() in {"200", "204"}:
-            logging.info(f"✅ [{data['proto'].upper()}] {data['addr']}"); return link
+            return link
     except: pass
     finally:
         if proc:
             proc.terminate()
-            try: proc.wait(timeout=2)
+            try: proc.wait(timeout=1)
             except: proc.kill()
         if os.path.exists(cfg_name): os.remove(cfg_name)
     return None
 
 def main():
     if not os.path.exists("distributor.txt"): return
-    with open("distributor.txt", "r", encoding="utf-8") as f: 
+    with open("distributor.txt", "r") as f: 
         proxies = list({ln.strip() for ln in f if ln.strip()})
     
-    logging.info(f"🚀 STELLA TITAN: Checking {len(proxies)} nodes...")
+    total = len(proxies)
+    logging.info(f"🚀 STELLA TITAN: Checking {total} nodes with {THREADS} threads...")
     valid = []
+    count = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=THREADS) as ex:
-        futs = [ex.submit(test_worker, proxies[i], i) for i in range(len(proxies))]
+        futs = [ex.submit(test_worker, proxies[i], i) for i in range(total)]
         for fu in concurrent.futures.as_completed(futs):
+            count += 1
             r = fu.result()
             if r: valid.append(r)
+            if count % 500 == 0: # Пишем прогресс каждые 500 нод
+                logging.info(f"⏳ Progress: {count}/{total} (Found: {len(valid)})")
             
-    with open("distributor.txt", "w", encoding="utf-8") as f: 
+    with open("distributor.txt", "w") as f: 
         f.write("\n".join(valid))
     logging.info(f"💎 Result: {len(valid)} alive nodes.")
 
