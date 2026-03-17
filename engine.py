@@ -28,7 +28,7 @@ PROTOCOLS = [
 
 MAX_CONCURRENT_PINGS = 120
 HTTP_TIMEOUT = 15.0          # Увеличила для медленных источников
-TCP_TIMEOUT = 2.0            # Увеличила для стабильности на МТС
+TCP_TIMEOUT = 0.8           # Увеличила для стабильности на МТС
 
 logging.basicConfig(
     level=logging.INFO,
