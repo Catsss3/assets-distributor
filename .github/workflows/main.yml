@@ -1,0 +1,30 @@
+name: Stella Titan X-Ray Sync
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Install
+        run: |
+          pip install --quiet aiohttp requests
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+          unzip -q Xray-linux-64.zip xray
+          chmod +x xray
+      - name: Run
+        run: |
+          python engine.py
+          python checker.py
+      - name: Deploy
+        run: |
+          git config --global user.name "Stella-Titan-Bot"
+          git config --global user.email "bot@stella.gold"
+          git add distributor.txt
+          git commit -m "💅 Stella: X-Ray Verified Update ✨" || echo "No changes"
+          git push
