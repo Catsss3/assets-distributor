@@ -4,7 +4,7 @@ import aiohttp
 import base64
 import re
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 
 BLACKLIST = ["127.0.0.1", "0.0.0.0"]
 PROTOCOLS = ["vless://", "hysteria2://", "hy2://", "tuic://"]
@@ -53,23 +53,30 @@ async def main() -> None:
         if not m: continue
         key = f"{m.group(1)}:{m.group(2)}"
         if key not in unique or len(link) > len(unique[key][0]): unique[key] = (link, src)
+    
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_PINGS)
-    async def check(data: tuple) -> tuple | None:
+    
+    # ИСПРАВЛЕНО: Убрали | и использовали Optional
+    async def check(data: Tuple) -> Optional[Tuple]:
         link, src = data
         m = pattern.search(link)
         if m and await tcp_ping(m.group(1), int(m.group(2))): return (link, src)
         return None
+
     results = await asyncio.gather(*[check(d) for d in unique.values()])
     alive = []
     for r in results:
         if r:
             alive.append(r[0]); source_stats[r[1]]["alive"] += 1
+    
     print("\n--- 📊 ОТЧЕТ ПО ИСТОЧНИКАМ ---")
     for url, stats in source_stats.items():
         if stats["total"] > 0:
             p = (stats["alive"] / stats["total"]) * 100
             print(f"{url.split('/')[-1]}: {stats['alive']}/{stats['total']} ({p:.1f}%)")
-    with open("distributor.txt", "w", encoding="utf-8") as f: f.write("\n".join(alive))
+    
+    with open("distributor.txt", "w", encoding="utf-8") as f: 
+        f.write("\n".join(alive))
     print(f"💎 Найдено {len(alive)} потенциальных нод.")
 
 if __name__ == "__main__": asyncio.run(main())
