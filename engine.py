@@ -2,8 +2,10 @@ import asyncio, aiohttp, re, base64, os
 
 async def fetch(session, url):
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        async with session.get(url, headers=headers, timeout=20) as res:
+        # Ставим короткий тайм-аут: 5 секунд на коннект, 10 на чтение
+        timeout = aiohttp.ClientTimeout(total=15, connect=5)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        async with session.get(url, headers=headers, timeout=timeout) as res:
             if res.status == 200:
                 return await res.text()
     except: pass
@@ -14,29 +16,30 @@ async def main():
     with open("sources.txt", "r") as f:
         urls = [l.strip() for l in f if l.strip().startswith("http")]
     
-    async with aiohttp.ClientSession() as session:
+    # Ограничиваем количество одновременных соединений до 20
+    connector = aiohttp.TCPConnector(limit_per_host=5)
+    async with aiohttp.ClientSession(connector=connector) as session:
         results = await asyncio.gather(*[fetch(session, u) for u in urls])
     
-    # Максимально широкий поиск: ищем всё, что похоже на ссылку vmess/vless/etc
-    # Добавляем захват всех символов до пробела или кавычки
+    # Регулярка для быстрого поиска
     raw_pattern = r"(?:vless|vmess|trojan|ss|ssr|tuic|hysteria2|hy2)://[^\s\"'<>#]+"
-    
     all_found = []
+    
     for text in results:
-        if not text: continue
-        # Ищем в открытом тексте
+        if not text or len(text) < 10: continue
+        
+        # 1. Быстрый поиск в чистом тексте
         all_found.extend(re.findall(raw_pattern, text, re.IGNORECASE))
         
-        # Пробуем декодировать всё подряд (вдруг там чистый Base64)
-        try:
-            # Чистим текст от пробелов для base64
-            clean_text = "".join(text.split())
-            decoded = base64.b64decode(clean_text).decode('utf-8', errors='ignore')
-            all_found.extend(re.findall(raw_pattern, decoded, re.IGNORECASE))
-        except: pass
+        # 2. Умный поиск Base64 (только если текст похож на него)
+        if len(text) > 20 and "=" in text[-3:] or len(text) % 4 == 0:
+            try:
+                decoded = base64.b64decode(text.strip()).decode('utf-8', errors='ignore')
+                all_found.extend(re.findall(raw_pattern, decoded, re.IGNORECASE))
+            except: pass
 
-    # Убираем дубли и пустые строки
-    nodes = list(set([n.strip() for n in all_found if len(n) > 10]))
+    # Фильтруем дубли и мусор
+    nodes = list(set([n.strip() for n in all_found if len(n) > 15]))
     
     with open("distributor.txt", "w") as f:
         f.write("\n".join(nodes))
