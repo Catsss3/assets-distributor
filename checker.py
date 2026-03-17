@@ -1,18 +1,13 @@
 import os, json, subprocess, time, socket, logging, concurrent.futures, uuid
 from urllib.parse import urlparse, parse_qs
-from typing import List
 
-TEST_URL = "http://cp.cloudflare.com/"
-TIMEOUT, THREADS, XRAY_PATH = 5, 50, "./xray"
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-def is_port_open(port: int) -> bool:
+def is_port_open(port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(0.5); return s.connect_ex(("127.0.0.1", port)) == 0
     except: return False
 
-def parse_link(link: str) -> dict | None:
+def parse_link(link):
     try:
         u = urlparse(link); qs = parse_qs(u.query)
         d = {"proto": u.scheme, "id": u.username, "addr": u.hostname, "port": int(u.port),
@@ -22,7 +17,7 @@ def parse_link(link: str) -> dict | None:
         return d
     except: return None
 
-def test_worker(link: str, task_id: int) -> str | None:
+def test_worker(link, task_id):
     data = parse_link(link)
     if not data or data["proto"] != "vless": return None
     l_port = 10000 + (task_id % 20000)
@@ -42,15 +37,14 @@ def test_worker(link: str, task_id: int) -> str | None:
     cfg_name = f"cfg_{uuid.uuid4().hex[:6]}.json"
     proc = None
     try:
-        with open(cfg_name, "w", encoding="utf-8") as f: json.dump(config, f)
-        proc = subprocess.Popen([XRAY_PATH, "-c", cfg_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        with open(cfg_name, "w") as f: json.dump(config, f)
+        proc = subprocess.Popen(["./xray", "-c", cfg_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(15):
             if is_port_open(l_port): break
             time.sleep(0.1)
         else: return None
-        res = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--proxy", f"socks5://127.0.0.1:{l_port}", TEST_URL, "--max-time", str(TIMEOUT)], capture_output=True, text=True, timeout=TIMEOUT+2)
-        if res.stdout.strip() in {"200", "204"}:
-            logging.info(f"✅ [OK] {data['addr']}"); return link
+        res = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--proxy", f"socks5://127.0.0.1:{l_port}", "http://cp.cloudflare.com/", "--max-time", "5"], capture_output=True, text=True, timeout=7)
+        if res.stdout.strip() in {"200", "204"}: return link
     except: pass
     finally:
         if proc: proc.terminate()
@@ -58,17 +52,15 @@ def test_worker(link: str, task_id: int) -> str | None:
         except: pass
     return None
 
-def main() -> None:
+def main():
     if not os.path.exists("distributor.txt"): return
-    with open("distributor.txt", "r", encoding="utf-8") as f: proxies = list({ln.strip() for ln in f if ln.strip()})
-    logging.info(f"🚀 X-ray прожарка {len(proxies)} нод...")
+    with open("distributor.txt", "r") as f: proxies = [l.strip() for l in f if l.strip()]
     valid = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=THREADS) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as ex:
         futs = [ex.submit(test_worker, proxies[i], i) for i in range(len(proxies))]
         for fu in concurrent.futures.as_completed(futs):
             r = fu.result()
             if r: valid.append(r)
-    with open("distributor.txt", "w", encoding="utf-8") as f: f.write("\n".join(valid))
-    logging.info(f"💎 Итог: {len(valid)} живых.")
+    with open("distributor.txt", "w") as f: f.write("\n".join(valid))
 
 if __name__ == "__main__": main()
