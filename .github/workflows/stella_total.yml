@@ -2,16 +2,22 @@ name: "🚀 STELLA TITAN X-RAY SYNC"
 
 on:
   schedule:
-    - cron: "0 */4 * * *" # Каждые 4 часа
-  workflow_dispatch: {} # Ручной запуск
+    - cron: "0 0 */2 * *" # Ровно в полночь каждые 48 часов 🌙
+  workflow_dispatch: {} # Оставляем ручной запуск, если приспичит обновить экстренно
+
+concurrency:
+  group: stella-titan
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
@@ -22,9 +28,8 @@ jobs:
         run: |
           pip install --quiet aiohttp requests
           wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
-          unzip -q Xray-linux-64.zip xray
+          unzip -o Xray-linux-64.zip xray
           chmod +x xray
-          # Проверка, что xray на месте
           ./xray version
 
       - name: 💎 Run Titan Engine
@@ -38,6 +43,5 @@ jobs:
           git config --global user.name "Stella-Titan-Bot"
           git config --global user.email "bot@stella.gold"
           git add distributor.txt
-          # Чтобы не падал, если изменений нет
-          git commit -m "💅 Stella: Titan Verified Update (VLESS/TUIC/HY2) ✨" || echo "Nothing to commit"
-          git push
+          git commit -m "💅 Stella: Titan Verified Update (VLESS/TUIC/HY2) ✨" || exit 0
+          git push origin main
