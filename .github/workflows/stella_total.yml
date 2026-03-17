@@ -1,21 +1,43 @@
-name: "🚀 STELLA VLESS TITAN"
+name: "🚀 STELLA TITAN X-RAY SYNC"
+
 on:
-  schedule: [{cron: "0 */6 * * *"}]
-  workflow_dispatch: {}
+  schedule:
+    - cron: "0 */4 * * *" # Каждые 4 часа
+  workflow_dispatch: {} # Ручной запуск
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: {contents: write}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.10"}
-      - run: pip install --quiet aiohttp
-      - run: python engine.py
-      - name: Deploy
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: 🛠 Install Deps & Xray
         run: |
-          git config --global user.name "Blondie-Bot"
-          git config --global user.email "stella@ai.com"
-          git add distributor.txt distributor.64
-          git commit -m "💅 Stella: Titan Engine Sync ✨" --allow-empty
+          pip install --quiet aiohttp requests
+          wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+          unzip -q Xray-linux-64.zip xray
+          chmod +x xray
+          # Проверка, что xray на месте
+          ./xray version
+
+      - name: 💎 Run Titan Engine
+        run: python engine.py
+
+      - name: 🦁 Run Monster Checker (VLESS/TUIC/HY2)
+        run: python checker.py
+
+      - name: 💅 Deploy Verified Nodes
+        run: |
+          git config --global user.name "Stella-Titan-Bot"
+          git config --global user.email "bot@stella.gold"
+          git add distributor.txt
+          # Чтобы не падал, если изменений нет
+          git commit -m "💅 Stella: Titan Verified Update (VLESS/TUIC/HY2) ✨" || echo "Nothing to commit"
           git push
