@@ -40,4 +40,4 @@ jobs:
           git config --global user.email 'action@github.com'
           git add githubmirror/*.txt distributor.txt README.md
           git commit -m "🚀 Плановое обновление прокси (12ч): $(date)" || echo "No changes"
-          git push
+          git push origin main --force
