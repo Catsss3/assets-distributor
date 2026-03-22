@@ -1,33 +1,8 @@
+import requests
+import re
+import os
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from collections import defaultdict
-from github import GithubException
-from github import Github, Auth
-from datetime import datetime
-import concurrent.futures
-import urllib.parse
-import threading
-import zoneinfo
-import re
-
-# --- СИСТЕМА ОБХОДА БЕЛЫХ СПИСКОВ (STELLA FIX) ---
-SAFE_SNI_LIST = ["gosuslugi.ru", "vtb.ru", "ya.ru", "vk.com", "ok.ru"]
-
-def apply_sni_fix(link):
-    import re
-    sni = SAFE_SNI_LIST[0]
-    if any(proto in link for proto in ["vless://", "vmess://", "trojan://"]):
-        if "sni=" in link:
-            link = re.sub(r"sni=[^&?#]+", f"sni={sni}", link)
-        else:
-            sep = "&" if "?" in link else "?"
-            link += f"{sep}sni={sni}&fp=chrome"
-    return link
-requests
-import urllib3
-import base64
-import html
-import json
 import re
 
 # --- СИСТЕМА ОБХОДА БЕЛЫХ СПИСКОВ (STELLA FIX) ---
