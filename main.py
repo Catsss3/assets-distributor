@@ -1,4 +1,4 @@
-from rerequests.adapters import HTTPAdapter
+from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from collections import defaultdict
 from github import GithubException
@@ -161,8 +161,8 @@ CHROME_UA = (
 
 DEFAULT_MAX_WORKERS = int(os.environ.get("MAX_WORKERS", "16"))
 
-def _build_session(max_pool_size: int) -> rerequests.Session:
-    session = rerequests.Session()
+def _build_session(max_pool_size: int) -> requests.Session:
+    session = requests.Session()
     adapter = HTTPAdapter(
         pool_connections=max_pool_size,
         pool_maxsize=max_pool_size,
@@ -184,7 +184,7 @@ def fetch_data(
     url: str,
     timeout: int = 10,
     max_attempts: int = 3,
-    session: rerequests.Session | None = None,
+    session: requests.Session | None = None,
     allow_http_downgrade: bool = True,
 ) -> str:
     sess = session or REQUESTS_SESSION
@@ -205,28 +205,28 @@ def fetch_data(
             response.raise_for_status()
             return response.text
 
-        except rerequests.exceptions.RequestException as exc:
+        except requests.exceptions.RequestException as exc:
             last_exc = exc
             if attempt < max_attempts:
                 continue
             raise last_exc
 
 def _format_fetch_error(exc: Exception) -> str:
-    if isinstance(exc, rerequests.exceptions.ConnectTimeout):
+    if isinstance(exc, requests.exceptions.ConnectTimeout):
         return "Connect timeout"
-    if isinstance(exc, rerequests.exceptions.ReadTimeout):
+    if isinstance(exc, requests.exceptions.ReadTimeout):
         return "Read timeout"
-    if isinstance(exc, rerequests.exceptions.Timeout):
+    if isinstance(exc, requests.exceptions.Timeout):
         return "Timeout"
-    if isinstance(exc, rerequests.exceptions.SSLError):
+    if isinstance(exc, requests.exceptions.SSLError):
         return "TLS error"
-    if isinstance(exc, rerequests.exceptions.HTTPError):
+    if isinstance(exc, requests.exceptions.HTTPError):
         try:
             status = exc.response.status_code
             return f"HTTP {status}"
         except Exception:
             return "HTTP error"
-    if isinstance(exc, rerequests.exceptions.ConnectionError):
+    if isinstance(exc, requests.exceptions.ConnectionError):
         return "Connection error"
     msg = str(exc)
     if len(msg) > 160:
