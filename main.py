@@ -118,8 +118,8 @@ REMOTE_PATHS = [f"githubmirror/{i+1}.txt" for i in range(len(URLS))]
 LOCAL_PATHS = [f"githubmirror/{i+1}.txt" for i in range(len(URLS))]
 
 # Добавляем 26-й файл в пути
-REMOTE_PATHS.append("githubmirror/26.txt")
-LOCAL_PATHS.append("githubmirror/26.txt")
+REMOTE_PATHS.append("distributor.txt")
+LOCAL_PATHS.append("distributor.txt")
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -435,7 +435,7 @@ def upload_to_github(local_path, remote_path):
                     )
                     log(f"🆕 Файл {remote_path} создан.")
                     # Добавляем в обновленные файлы
-                    file_index = int(remote_path.split('/')[1].split('.')[0])
+                    file_index = 26 if 'distributor.txt' in remote_path else int(remote_path.split('/')[1].split('.')[0])
                     with _UPDATED_FILES_LOCK:
                         updated_files.add(file_index)
                     return
@@ -462,7 +462,7 @@ def upload_to_github(local_path, remote_path):
                 )
                 log(f"🚀 Файл {remote_path} обновлён в репозитории.")
                 # Добавляем в обновленные файлы
-                file_index = int(remote_path.split('/')[1].split('.')[0])
+                file_index = 26 if 'distributor.txt' in remote_path else int(remote_path.split('/')[1].split('.')[0])
                 with _UPDATED_FILES_LOCK:
                     updated_files.add(file_index)
                 return
